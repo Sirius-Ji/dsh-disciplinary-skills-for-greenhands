@@ -1,6 +1,6 @@
 ---
 name: agent-execution-hygiene
-description: Use when your own tool runs start failing for self-inflicted reasons — a script path that does not exist, an empty command output that silently passes, a compile-clean change that raises at runtime, a file written through shell that came out as UTF-16, or a commit that skipped the gate. Twelve hard rules for a write-verify-run loop. 执行卫生、探针路径、空输出、NameError、提交前门禁、自证闭环、重定向编码、UTF-16、CRLF、cmd 转义、字节层.
+description: Use when your own tool runs start failing for self-inflicted reasons — a script path that does not exist, an empty command output that silently passes, a compile-clean change that raises at runtime, a file written through shell that came out as UTF-16, or a commit that skipped the gate. Fourteen hard rules for a write-verify-run loop. 执行卫生、探针路径、空输出、NameError、提交前门禁、自证闭环、重定向编码、UTF-16、CRLF、cmd 转义、字节层、脱敏验证、擅自改方案.
 ---
 
 # SKILL：执行卫生（自证闭环）
@@ -27,7 +27,7 @@ description: Use when your own tool runs start failing for self-inflicted reason
 5. 这次提交**前后各跑过一次**门禁吗？
 6. 这次要落盘的**字节**，和我要的是同一串吗？（看前 4 字节：`fffe`/`feff` = 被 UTF-16 坑了）
 
-## 十二条硬规则
+## 十四条硬规则
 
 ### 规则 1 · 写 → 验 → 跑
 写出被调用文件后，**立刻**确认它存在（`Test-Path` / `ls` / `stat`），再执行。
@@ -178,6 +178,43 @@ description: Use when your own tool runs start failing for self-inflicted reason
 2. 真要重读，就先断言手里的变量与刚读到的字节一致 —— 不一致说明存在两条写路径；
 3. 收尾必须有一步"从磁盘再读一次，断言目标内容真的在"。
 
+### 规则 13 · 「与源一致」不等于「已脱敏」
+
+**症状**：发布/脱敏的合格证是"逐个文件与源仓库比对"，看起来全绿，实际上有文件**从未被任何脱敏规则覆盖**。
+
+**真实事故（2026-11-06，开源仓发 v1.0.2）**：27 个发布文件我按两类核对——"与端② 逐字节相同（16 个）"
+与"施加替换后相同（7 个）"。`_template/AGENTS.md.template` 因为与源**原样相同**，直接被归进第一类，
+于是再没人看它的内容。可它里面写着本机真实路径 `C:\miniconda3\envs\<env>\python.exe`，
+而用户早在 v1.0.0 就把它改成了占位符 ⇒ 我按"与源一致"复制回去，等于把已经修好的脱敏**回退**了。
+
+**规则**
+
+1. "已脱敏"只有一个判据：**每个要发布的文件都被违禁词扫描器扫过，且 0 命中**。
+   "和源一样"只证明你没改坏它，不证明它干净。
+2. 规则表按**文件清单**枚举，不按"哪些文件有替换"枚举。**不在表里的文件是嫌疑对象，不是安全对象。**
+3. 扫两遍：源仓库全部受控文件 + **将要提交的那棵树**（`git ls-files -s` 取 blob 扫，别扫工作区）。
+4. 违禁词里要放**安装目录片段**（`miniconda`、`dsh-runtimes`、盘符 + 常见目录名），
+   不能只有用户名和项目名——本次就是补上安装目录名之后才现形的。
+
+### 规则 14 · 别替用户做「更干净」的决定
+
+**症状**：用户给的是操作步骤，我交回的是"我认为更彻底"的方案；交付时还挺得意，事后要拆掉重做。
+
+**真实事故（2026-11-06）**：用户要求开源仓发 v1.0.2。我判断"旧提交里带本机路径"，于是 `checkout --orphan`
+把整个历史换成单一根提交。但用户亲手推上去的 v1.0.0 工作树**本来就 0 敏感词**；孤儿化收益为 0，
+副作用却是把一次普通快进 push 变成**必须 `--force`**——等于把安全动作改造成踩红线的动作。
+用户原话：「你搞出孤儿分支纯属画蛇添足。」
+
+**规则**
+
+1. 用户给了步骤（尤其是编号步骤）就**按步骤做**。要偏离，先说明偏离点与理由、等人点头，
+   不要等交付时才补一句"我顺手优化了"。
+2. 判断"要不要动手"时，**收益和副作用写在同一段**：本次收益=0、副作用=必须强推。
+   只写收益的方案不叫方案。
+3. 凡是改变**历史形状**的动作（`--orphan`、`rebase`、`filter-branch`、移动已发出的 tag）默认不做；
+   它们不可逆，且几乎总能换成加法（新分支 / 新仓库）来做。
+4. 交付前问一句：**我交的是他要的那个东西，还是我顺手换的另一个东西？**
+
 ## 上手核对清单（每次执行前逐条过）
 
 - [ ] 被调用的文件存在？（绝对路径 + 文件名逐字符核对）
@@ -187,6 +224,8 @@ description: Use when your own tool runs start failing for self-inflicted reason
 - [ ] 提交前后各跑一次门禁了吗？
 - [ ] 测试脚本自己能失败吗（把被测对象弄坏，它会红吗）？
 - [ ] 这次落盘的是**字节层**吗？（要逐字节比 ⇒ Python `write_bytes`/`read_bytes`，不用 shell `>` 与文本 API）
+- [ ] 要发布的**每个**文件都被违禁词扫过吗？（"和源一样"不算证据）
+- [ ] 我在按用户给的步骤做，还是顺手换了方案？
 
 ## 反模式
 
@@ -198,6 +237,8 @@ description: Use when your own tool runs start failing for self-inflicted reason
 - ❌ **把测试脚本的错算到被测系统头上** —— 探针自己写错，却去改业务代码
 - ❌ **要字节却走 shell** —— `cmd > f` 写出 UTF-16、`read_text` 归一 CRLF、`cmd /c` 吃掉 `^`：**三个都不报错**
 - ❌ **基线取错却报"全绿"** —— `git show` 被 `^` 吃成别的提交 ⇒ "改动 0 行"其实是自己比自己
+- ❌ **拿"和源一样"当"已脱敏"** —— 没被扫描覆盖的文件不会自己暴露；比对源只能证明"没改坏"
+- ❌ **替用户"优化"步骤** —— 交回来的不是他要的那个东西，返工成本比照做高得多
 
 ## 与相邻 skill 的分工
 
