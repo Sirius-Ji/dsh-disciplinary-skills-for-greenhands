@@ -96,7 +96,8 @@ description: Use when the same pitfall recurs three times, a major incident gets
    此时端③ 处于「临时脏」状态 —— 这是预期，不要慌；
 4. **核验**：`python .hooks/verify_3ends.py --all` 必须输出 `✓ 三端一致，行尾干净`；
 5. **提交**：`git commit`（消息带证据锚，如 `refs H-0042`）；
-6. **推送**：`git push origin master`，并确认裸库 `refs/heads/master` 已更新；
+6. **推送**：`git push origin master`（仅本地裸库），并确认裸库 `refs/heads/master` 已更新；
+   > **绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。**
 7. **端③ 收尾**：`git fetch origin && git reset --hard origin/master`（清掉第 3 步的临时脏状态，对齐新提交）；
 8. 报告：改了哪一端、哪几行、哈希前后值、回滚命令。
 
@@ -105,7 +106,7 @@ description: Use when the same pitfall recurs three times, a major incident gets
 1. 查工作树干净；
 2. 改端② 的 SKILL.md；
 3. **直接 commit**（暂存区不含根 AGENTS.md ⇒ 钩子只提示、不阻断）；
-4. 推送；
+4. 推送（**绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。**）；
 5. **端③ 的派生由快进完成**：`git fetch origin && git reset --hard origin/master`；
    ⚠️ **不要**在 commit 前手工把 SKILL.md 拷进端③ —— 那会让端③ 变脏，之后的快进会失败；
 6. 核验端②/端③ 的 SKILL.md SHA-256 一致；

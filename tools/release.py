@@ -177,6 +177,8 @@ def main():
         die(6, "打 tag 失败：%s" % out)
     say("✓", "已打 tag %s @ %s（annotated）" % (ver, head))
 
+    # ★ 绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。
+    #   --push 只会推给 origin；执行前先 `git remote -v` 确认 origin 是本地路径（不是 GitHub/Gitee）。
     # --- 7. 推送（默认不做）---
     if args.push:
         rc, out = run(["git", "push", "origin", "master"], repo)
@@ -187,8 +189,9 @@ def main():
             die(6, "推送 tag 失败：%s" % out)
         say("✓", "已推送 master 与 tag %s" % ver)
     else:
-        say("·", "未推送。要发到远端请执行：")
+        say("·", "未推送。要发到远端请执行（仅限本地裸库；外网/公网一律禁止）：")
         print("    cd %s" % repo)
+        print("    # 绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。")
         print("    git push origin master")
         print("    git push origin %s" % ver)
 

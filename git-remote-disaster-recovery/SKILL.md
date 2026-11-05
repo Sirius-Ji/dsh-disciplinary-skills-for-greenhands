@@ -20,6 +20,9 @@ description: Use when a force-push overwrote history, when a repository was rena
 所有"删掉重建"的冲动，都是把最后一点残骸也抹掉。
 在动任何恢复命令之前，先把远端仓整个复制一份（`cp -r hub.git hub.git.bak-<时间戳>`）。
 
+> **★ 推送红线**：**绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。**
+> 本文里所有 `git push` / `git push -f` 步骤，都只对**本地裸库**成立。
+
 ## 1. 强推覆盖：先分类"丢了什么"
 
 三种损失，恢复手段完全不同：
@@ -41,12 +44,12 @@ description: Use when a force-push overwrote history, when a repository was rena
 
 **经过**：把代码推到 `example-backupdemo` 时推送失败——远端仓库已经**改过名**，
 而本地 `origin` 的 URL 还指着旧名字。修正动作是 `git remote set-url origin <新地址>`，
-之后用 `git push -f` 强推，把远端那段**错误的历史**覆盖掉。
+之后用 `git push -f` 强推（**仅限本地裸库**；外网/公网一律禁止），把远端那段**错误的历史**覆盖掉。
 
 **这里其实同时发生了两件事**，值得分开看：
 
 1. **改名不同步**：仓库改名后，本地 remote 配置**不会自动更新**。
-   所以每次"推不上去"的第一反应应该是 `git remote -v`，而不是 `git push -f`。
+   所以每次"推不上去"的第一反应应该是 `git remote -v`，而不是 `git push -f`（同样仅限本地裸库）。
 2. **强推覆盖**：`-f` 会**不可逆地改写远端引用**。这次是刻意的（远端历史是错的），
    但同样的动作用在别人的分支上就是灾难。
 
@@ -57,7 +60,7 @@ description: Use when a force-push overwrote history, when a repository was rena
 ② git ls-remote origin <branch>      ← 再确认远端当前是什么
 ③ git log --oneline origin/main..HEAD ← 确认本地多出什么、会不会覆盖别人的提交
 ④ 备份远端（裸库整目录复制）
-⑤ 才允许 git push -f
+⑤ 才允许 git push -f              ← 仅限本地裸库；外网/公网一律禁止
 ```
 
 **教训**：`-f` 之前必须先能回答"我要覆盖掉的这些提交，还有没有别的副本"。

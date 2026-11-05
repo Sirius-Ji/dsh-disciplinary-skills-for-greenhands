@@ -1,13 +1,13 @@
 ---
 name: session-handoff
-description: Use at the start of any session in a workspace that has HANDOFF.md, and after every completed subtask — a three-file handoff protocol (HANDOFF.md / ARCHIVE.md / ARCHIVE_INDEX.md) that keeps the latest progress in context while the full history stays off-context, retrieved by index plus anchored grep instead of wholesale reads. 会话交接、进度接力、归档索引、grep 检索、上下文溢出、跨会话接手.
+description: Use at the start of every task and when closing it; if the workspace has no HANDOFF.md, create the skeleton immediately and run the archive protocol — a three-file handoff protocol (HANDOFF.md / ARCHIVE.md / ARCHIVE_INDEX.md) that keeps the latest progress in context while the full history stays off-context, retrieved by index plus anchored grep instead of wholesale reads. 会话交接、进度接力、归档索引、grep 检索、上下文溢出、跨会话接手.
 ---
 
 # SKILL：会话交接（Handoff）
 
-**适用场景**：工作区根存在 `HANDOFF.md`；或任务跨会话、超过 8 轮、需要移交给别的会话。
+**触发（强制，无前置条件）**：**每次任务启动或收尾时使用；若工作区没有 `HANDOFF.md`，必须立即创建骨架并执行归档流程。**
 
-**不适用**：一次性小任务；工作区没有交接文件且用户未要求建立。
+**不适用**：无。它是强制项——不存在「工作区还没有交接文件，所以这轮不用做」这种豁免。
 
 ## 一、三个文件
 

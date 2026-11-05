@@ -121,11 +121,11 @@ DSH调用工具存在惯性，最严重的一次事故直接导致主程序中�
 ```yaml
 ---
 name: session-handoff
-description: Use at the start of any session in a workspace that has HANDOFF.md...
+description: Use at the start of every task and when closing it; if the workspace has no HANDOFF.md, create the skeleton immediately and run the archive protocol...
 ---
 ```
 
-这个 `description` 不是简介，是**触发词**。AI 靠它判断当前任务要不要加载这个技能。所以写"会话交接"没用，写"当工作区存在 HANDOFF.md 时应加载"才有用。我第一次写的时候全写成了名词，一个都没被加载过。
+这个 `description` 不是简介，是**触发词**。AI 靠它判断当前任务要不要加载这个技能。所以写"会话交接"没用，写"每次任务启动或收尾时使用；工作区没有 HANDOFF.md 就立即建骨架"才有用。我第一次写的时候全写成了名词，一个都没被加载过。
 
 配上 `AGENTS.md` 一起用：
 
@@ -134,7 +134,9 @@ description: Use at the start of any session in a workspace that has HANDOFF.md.
 ~/.dsh/skills/       ← 具体技能，按需加载
 ```
 
-`AGENTS.md` 里每条末尾挂一个"详见 skill: xxx"，让它知道往哪儿翻。仓库里的 `AGENTS.repo.md` 是我自己那份，可以拿去当模板，但建议你先把里面的内容删掉，换成你自己的坑——抄别人的规矩你是执行不下去的。
+`AGENTS.md` 里每条末尾挂一个"详见 skill: xxx"，让它知道往哪儿翻。
+
+其中一条是硬红线：**绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。**仓库里的 `AGENTS.repo.md` 是我自己那份，可以拿去当模板，但建议你先把里面的内容删掉，换成你自己的坑——抄别人的规矩你是执行不下去的。
 
 **如果你用的不是 DSH**，而是 Claude Code / Cursor 之类支持规则目录的工具，把目录换成对应的约定（比如 `.claude/skills/`），`SKILL.md` 格式基本通用。
 
