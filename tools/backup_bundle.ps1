@@ -18,11 +18,11 @@
 
 .EXAMPLE
     .\backup_bundle.ps1
-    .\backup_bundle.ps1 -OutDir '<你的备份目录>' -Tag 'before-p4'
+    .\backup_bundle.ps1 -OutDir '<你的云盘>\skills' -Tag 'before-p4'
 #>
 [CmdletBinding()]
 param(
-    [string]$OutDir = '<你的备份目录>',
+    [string]$OutDir = '<你的备份目录>\skills-bundles',
     [string]$Tag    = '',
     [string]$RepoPath = ''
 )

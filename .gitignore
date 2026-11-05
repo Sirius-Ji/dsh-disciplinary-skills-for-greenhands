@@ -24,3 +24,6 @@ desktop.ini
 .backup/
 .hooks/
 gitdir:*
+
+# 发布产物（手工上传，不进仓库）
+*.zip

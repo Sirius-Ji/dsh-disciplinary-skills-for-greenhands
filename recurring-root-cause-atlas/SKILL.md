@@ -1,6 +1,6 @@
 ---
 name: recurring-root-cause-atlas
-description: Use when a bug feels familiar or keeps reappearing in new shapes — build a root-cause genealogy and match eight recurring archetypes (escaped newlines, implicit defaults, data never stored, encoding round-trip, delimiter collision, new predicate short-circuiting an old one, probe before commit, fixing only one of several identical call sites). 同一病根、反复出现、谱系、预防.
+description: Use when a bug feels familiar or keeps reappearing in new shapes — build a root-cause genealogy and match nine recurring archetypes (escaped newlines, implicit defaults, data never stored, encoding round-trip, delimiter collision, new predicate short-circuiting an old one, probe before commit, fixing only one of several identical call sites, configuring the wrong copy where the tracked file is not the executed one). 同一病根、反复出现、谱系、预防、配置不生效、改了没反应、钩子没运行.
 ---
 
 # SKILL：同一病根反复出现
@@ -57,7 +57,7 @@ description: Use when a bug feels familiar or keeps reappearing in new shapes �
 
 ---
 
-## 本项目八类病根谱系
+## 本项目九类病根谱系
 
 ### 病根 ①：`\n` / 反斜杠被"吃掉"
 
@@ -206,6 +206,53 @@ description: Use when a bug feels familiar or keeps reappearing in new shapes �
 1. 加临时探针前 ⇒ **先提交修复**（或 `git stash` / 备份到 `data/tmp/`）；
 2. 撤探针时 ⇒ **只撤探针那部分**（逐 hunk 或临时文件）。
 
+### 病根 ⑧：同一根因的多个落点，只修了一处
+
+**病根**：一个根因往往对应**多个调用点 / 多个字段 / 多条路径**。修好你手上那一处之后，
+其余落点会以"换了个症状"的方式再犯一次。
+
+- 典型形态：同一个"查表的键"在 A 函数里查会失效，你把 A 修好了；
+  B 函数用同一个键查**另一个字段**，仍然失效，但症状不同（A 是正文空白，B 是说明空白）。
+- 识别句：**"这个修复，我在别的地方是不是也用过同样的写法？"**
+- 动作：修完一处后**全仓搜同款调用**（同一个 API 名、同一段 SQL、同一个取数函数），
+  把"同源落点"一次清完；清不完就**记在案卷里**（哪个落点已知未修）。
+- 反模式：把第二次复发当成"新 bug"重新侦察——会白跑一遍，且再次只修一处。
+
+---
+
+### 病根 ⑨：配置了，但不是生效的那份
+
+**识别句**：**"我改的这个文件，真的是程序执行时读的那一份吗？"**
+
+这是假绿最隐蔽的一种形态 —— **改动本身没错，错在改错了对象**。三种常见形态：
+
+| 你以为在改 | 实际生效的 |
+| --- | --- |
+| 仓库里的 `.hooks/pre-commit` | `$GIT_DIR/hooks/pre-commit` |
+| 本地 `.git/config` 里的某项 | 全局 `~/.gitconfig` 或工作区级配置 |
+| 多副本派生里的某一端 | 程序真正读取的那一端 |
+
+**判据（30 秒自查）**
+
+1. `git config --show-origin --get <key>` —— 看**来源文件**，不是看值；
+2. `git rev-parse --absolute-git-dir` —— 和 `<repo>/.git` 是不是同一个地方；
+3. `.git` 是**目录还是文件**？是文件（`gitdir: …`）就说明这是指针，真实仓库在别处；
+4. 改完立刻做一次**可观测的最小动作**（提交一次 / 跑一次脚本），看它是否打印你新增的那行。
+
+**机制层对策**
+
+- 让**被跟踪的文件成为唯一权威**：`git config core.hooksPath .hooks`，
+  并把 `$GIT_DIR/hooks/*` 降级成转发器 `exec "$ROOT/.hooks/pre-commit"`；
+- 凡是"配置 + 执行"分离的系统（钩子、CI、别名、profile 覆盖），
+  都必须能回答一句：**"哪个文件是权威？"** 答不上来就是定时炸弹；
+- 改动后用**运行时证据**（它打印了什么）而不是**文件证据**（文件里写了什么）自证。
+
+**反模式**
+
+- ❌ 改完看到文件内容变了，就认为行为会变；
+- ❌ 假设 `core.hooksPath` 为空时走的是仓库内那份；
+- ❌ 靠"记得改两份"来维持两份配置一致。
+
 ---
 
 ## 预防清单（"改机制"而不是"打补丁"）
@@ -219,6 +266,8 @@ description: Use when a bug feels familiar or keeps reappearing in new shapes �
 | ⑤ 分隔符冲突 | 落盘前**转义**字段内分隔符；优先 JSON/JSONL；读回来**先断言条数与字段格式** |
 | ⑥ 判据被短路 | 改判据函数时**逐条问"旧触发条件还可达吗"**；要么明确删掉、要么写成"**或**"；**加一条只命中旧判据的回归断言** |
 | ⑦ 探针回退修复 | 加临时探针**前先提交**（或 stash / 备份）；撤探针时**只撤探针**那部分 |
+| ⑧ 多落点只修一处 | 修完一处**全仓搜同款**；清不完就记入案卷（哪个落点已知未修） |
+| ⑨ 配置了没生效 | 先问"**权威副本是哪一份**"；`--show-origin` 查来源；改完用**运行时证据**自证 |
 
 ---
 
@@ -275,22 +324,6 @@ description: Use when a bug feels familiar or keeps reappearing in new shapes �
 
 > 谱系是靠"承认这是同一个病根"建起来的——把复发当成"新问题"，谱系就永远建不起来。
 
-
-一个根因往往对应**多个调用点 / 多个字段 / 多条路径**。修好你手上那一处之后，
-其余落点会以"换了个症状"的方式再犯一次。
-
-- 典型形态：同一个"查表的键"在 A 函数里查会失效，你把 A 修好了；
-  B 函数用同一个键查**另一个字段**，仍然失效，但症状不同（A 是正文空白，B 是说明空白）。
-- 识别句：**"这个修复，我在别的地方是不是也用过同样的写法？"**
-- 动作：修完一处后**全仓搜同款调用**（同一个 API 名、同一段 SQL、同一个取数函数），
-  把"同源落点"一次清完；清不完就**记在案卷里**（哪个落点已知未修）。
-- 反模式：把第二次复发当成"新 bug"重新侦察——会白跑一遍，且再次只修一处。
-
-## 病根 ⑧：同一根因的多个落点，只修了一处
-
-
-- 识别句：**"这个修复，我在别的地方是不是也用过了同样的写法？"**
-
 ## 实战案例与复盘
 
 > 以下为该项目当时的一手记录，保留原始术语（项目名 / 模块名 / 改动编号），仅作方法论的实证注解。
@@ -300,6 +333,7 @@ description: Use when a bug feels familiar or keeps reappearing in new shapes �
 - FLAKE-3 之前的历史归档被误判 ⇒ "五类"变成**六类**。
 - **同日再补病根 ⑦（临时探针之前必须先提交）** —— 实例来自 AK-2 与回归-4（**同一个病根第 2 次**）
 - ⇒ "六类"变成**七类**。
+- **2026-11-05 补录 ⑧、⑨**：⑧=同一根因多落点只修一处；⑨=配置了但未生效（钩子副本漂移，见实战复盘） ⇒ "七类"变成**九类**。
 - **预防（机制层）**：① 关键参数**显式写死**（不依赖库默认）；
 - ② 对"会被别人改回去"的状态，**在最末尾再设一次**（卡片 J 的修法）或加**顺序断言**。
 - 对话里临时起的编号（"方案 A-1""卡片 ③"）**在 git 里查不到**。

@@ -1,6 +1,6 @@
 ---
 name: agent-execution-hygiene
-description: Use when your own tool runs start failing for self-inflicted reasons — a script path that does not exist, an empty command output that silently passes, a compile-clean change that raises at runtime, a file written through shell that came out as UTF-16, or a commit that skipped the gate. Nine hard rules for a write-verify-run loop. 执行卫生、探针路径、空输出、NameError、提交前门禁、自证闭环、重定向编码、UTF-16、CRLF、cmd 转义、字节层.
+description: Use when your own tool runs start failing for self-inflicted reasons — a script path that does not exist, an empty command output that silently passes, a compile-clean change that raises at runtime, a file written through shell that came out as UTF-16, or a commit that skipped the gate. Twelve hard rules for a write-verify-run loop. 执行卫生、探针路径、空输出、NameError、提交前门禁、自证闭环、重定向编码、UTF-16、CRLF、cmd 转义、字节层.
 ---
 
 # SKILL：执行卫生（自证闭环）
@@ -27,7 +27,7 @@ description: Use when your own tool runs start failing for self-inflicted reason
 5. 这次提交**前后各跑过一次**门禁吗？
 6. 这次要落盘的**字节**，和我要的是同一串吗？（看前 4 字节：`fffe`/`feff` = 被 UTF-16 坑了）
 
-## 九条硬规则
+## 十二条硬规则
 
 ### 规则 1 · 写 → 验 → 跑
 写出被调用文件后，**立刻**确认它存在（`Test-Path` / `ls` / `stat`），再执行。
@@ -103,7 +103,7 @@ description: Use when your own tool runs start failing for self-inflicted reason
 
 **为什么最容易犯**：坑 1/4/5 都不报错，坑 2 的差异"看起来像真差异"。唯一自救：**看字节 + 用已知期望值证伪**（见下方实战案例）。
 
-**工具**：`tools/byte_gate.py`（本项目）把这条降级成命令——
+**工具**：`tools/byte_gate.py` 是我**另一个项目**里的脚本，本仓库不含它，别照抄路径——要复现就把下面几条命令包成自己的小工具。原意是——
 **`extract`（从 git 取基线，不经 shell ⇒ 坑 1/4 物理消失）** / `head` / `cmp` / `eol` / `--selftest`（7 条自检，含 extract 端到端）。
 
 ### 规则 9 · 自定义函数/参数别撞内置名
@@ -133,6 +133,50 @@ description: Use when your own tool runs start failing for self-inflicted reason
 
 3. 想知道名字是否已被占用：`Get-Alias -Name <名字>`（非空 = 撞了），
    以及 `Get-Variable -Name <名字> -ErrorAction SilentlyContinue`（非空 = 撞自动变量）。
+
+### 规则 10 · 跨进程取文本，必须写明编码
+
+**症状**：脚本跑到一半突然抛 `UnicodeDecodeError`，前面已经写盘的步骤**不会自动回滚**，留下半成品。
+
+**真实事故（2026-11-05，`tools/release.py` 第一次真跑）**：脚本用
+`subprocess.run(..., text=True)` 去调自己的 `bump_handoff.py`。Windows 下 `text=True`
+拿系统代码页（GBK）解码子进程输出，而我们的工具一律输出 UTF-8 ⇒ 读到第一个中文就炸。
+炸点在**父进程解码**，子进程其实已经把版本号成功写进文件了。
+
+**规则**
+
+1. 任何跨进程取文本的地方，显式写 `encoding="utf-8", errors="replace"`，不依赖平台默认；
+2. Python 脚本开头就 `sys.stdout.reconfigure(encoding="utf-8")` —— **临时脚本也一样**，
+   一个 `✓` 打进 GBK 控制台就能让整个流程中断；
+3. 父进程既要捕获子进程输出，就要同时想好"子进程炸了怎么还原"（本脚本加了 `try/except` 还原备份）。
+
+### 规则 11 · 锚点用行内短串，跨行就按行改
+
+**症状**：替换/插入脚本报"锚点命中 0 次"；更糟的是命中 0 次但脚本仍然报"成功"。
+
+**真实事故（2026-11-05，README 批量改写）**：README 是 CRLF，我拿一段**含换行的整句**
+去做字符串匹配，实际文件里是 `\r\n` ⇒ 命中 0。同类的还有：按 `\n` 切行再拼回去，
+行尾被整体换掉，哈希和字节数都变。
+
+**规则**
+
+1. 锚点只用**单行内的短子串**（不超过 30 字符、不含换行）；
+2. 需要跨行定位时，改成"按行内容找到行号 → 插入"，不要拼整句；
+3. 写完**独立再读一次盘**核对目标串在不在，别信脚本自己打的 ✓。
+
+### 规则 12 · 改完就写，别中途重读覆盖
+
+**症状**：脚本每一步都打 ✓，最后打开文件却发现你的改动不在里面。
+
+**真实事故（2026-11-05，同一次 README 改写）**：我在内存里做完了两处替换，
+随后为了取行尾风格又 `open()` 读了一遍磁盘，最后把**从磁盘重读的那份**写了回去
+⇒ 两处替换被静默丢弃，只有后面插入的内容生效。验证阶段才发现"10份"还在文件里。
+
+**规则**
+
+1. 一份内容**全程只读一次盘**，之后所有变换在内存里做，最后一次写；
+2. 真要重读，就先断言手里的变量与刚读到的字节一致 —— 不一致说明存在两条写路径；
+3. 收尾必须有一步"从磁盘再读一次，断言目标内容真的在"。
 
 ## 上手核对清单（每次执行前逐条过）
 
