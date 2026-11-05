@@ -26,7 +26,7 @@
     3  发版前门禁未通过（HANDOFF 缺失 / 过期 / 版本不符 / 时间戳在未来）
     4  发版后门禁复验未通过（已回滚 HANDOFF）
     5  工作树在本脚本之外仍有未提交改动（提交后仍不干净）
-    6  git 操作失败
+    6  git 操作失败；或 origin 指向外网/非本机路径（推送机械闸门拦下）
 """
 
 import argparse
@@ -65,6 +65,32 @@ def run(args, cwd, capture=True):
                        stdout=subprocess.PIPE if capture else None,
                        stderr=subprocess.STDOUT if capture else None)
     return p.returncode, (p.stdout or "").strip() if capture else ""
+
+
+# ---- 推送机械闸门（注释拦不住脚本，只有这道闸门能把外网堵死）----
+EXTERNAL_MARKERS = ("http://", "https://", "git@")
+LOCAL_ABS_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def assert_local_origin(repo):
+    """只允许把代码推到本机绝对路径的 origin；任何外网形态一律中止。
+
+    判定（全部满足才放行）：
+      1. 能读到 origin；
+      2. 不含 http:// / https:// / git@ 任意外网特征；
+      3. 是 Windows 本地绝对路径（形如 D:\\ 或 C:/）。
+    其余情况一律 fail-closed —— 包括读不到 origin、相对路径、ssh://、file://。
+    """
+    rc, origin = run(["git", "remote", "get-url", "origin"], repo)
+    origin = origin.strip() if rc == 0 else ""
+    blocked = (not origin) or any(m in origin for m in EXTERNAL_MARKERS) \
+        or not LOCAL_ABS_RE.match(origin)
+    if blocked:
+        print("Error: 绝对禁止向任何外网仓库执行 push！", file=sys.stderr)
+        print("  origin = %s" % (origin or "<读取失败或未配置>"), file=sys.stderr)
+        print("  只允许本机绝对路径，例如 D:\\xxx.git 或 C:\\xxx.git", file=sys.stderr)
+        sys.exit(6)
+    say("✓", "origin 是本机路径，放行：%s" % origin)
 
 
 def main():
@@ -181,6 +207,7 @@ def main():
     #   --push 只会推给 origin；执行前先 `git remote -v` 确认 origin 是本地路径（不是 GitHub/Gitee）。
     # --- 7. 推送（默认不做）---
     if args.push:
+        assert_local_origin(repo)          # 闸门：外网 origin 直接中止
         rc, out = run(["git", "push", "origin", "master"], repo)
         if rc != 0:
             die(6, "推送 master 失败：%s" % out)
