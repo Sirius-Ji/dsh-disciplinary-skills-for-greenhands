@@ -22,7 +22,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$OutDir = '<你的备份目录>\skills-bundles',
+    [string]$OutDir = '<你的备份目录>\backup\skills-bundles',
     [string]$Tag    = '',
     [string]$RepoPath = ''
 )
