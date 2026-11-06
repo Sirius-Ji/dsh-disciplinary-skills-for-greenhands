@@ -5,7 +5,7 @@ description: Use when commits vanished after a reset/rebase/force-push, or when 
 
 # SKILL：Git 事故恢复（单仓版）
 
-> 2026-11-06 架构简化后，本机只有一个 Git 仓库：`<你的主库路径>/skills`。
+> 2026-11-06 架构简化后，本机只保留一个 Git 仓库（当前工作区的 `skills/`；绝对路径以该工作区根 `AGENTS.md` 为准）。
 > 没有裸库、没有镜像、没有第二份工作副本。本文只保留单仓仍然成立的恢复手段。
 
 ## 快速判断

@@ -65,7 +65,9 @@ description: Use when the same pitfall recurs three times, a major incident gets
 ## 四、准入后的写入流程（严格按序 · **改 → 提交 → 同步 → 核验**）
 
 > **为什么不是「提交时比对三端」了？**
-> 2026-11-06 架构简化：全机只剩一个 Git 仓库（`<你的主库路径>/skills`）。
+> 2026-11-06 架构简化：全机只剩一个 Git 仓库，**技能进化只准写入 `<你的主库路径>\skills`**。
+> 哪怕你在 某项目 之类的**别的项目**里触发进化，也**不许在那个项目里新建 `skills` 目录**。
+> （技能同步进开源仓时，这条真路径由脱敏流程换成 `<你的主库路径>/skills`。）
 > 运行环境 `~/.dsh/skills` 与 `~/.dsh/AGENTS.md` 是**纯文件产物**，由
 > `tools/sync-to-runtime.py` 单向覆盖。**没有「三端」，也就没有跨端哈希比对。**
 > pre-commit 只查本仓库自己的三件事：双胞胎护栏、CRLF/UTF-8、HANDOFF 门禁。
