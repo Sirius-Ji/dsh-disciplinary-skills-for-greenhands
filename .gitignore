@@ -27,3 +27,6 @@ gitdir:*
 
 # 发布产物（手工上传，不进仓库）
 *.zip
+
+# release/ 发布打包产物（zip 不进 Git）
+/release/
