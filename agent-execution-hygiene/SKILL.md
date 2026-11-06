@@ -27,7 +27,7 @@ description: Use when your own tool runs start failing for self-inflicted reason
 5. 这次提交**前后各跑过一次**门禁吗？
 6. 这次要落盘的**字节**，和我要的是同一串吗？（看前 4 字节：`fffe`/`feff` = 被 UTF-16 坑了）
 
-## 十六条硬规则
+## 十八条硬规则
 
 ### 规则 1 · 写 → 验 → 跑
 写出被调用文件后，**立刻**确认它存在（`Test-Path` / `ls` / `stat`），再执行。
@@ -253,6 +253,77 @@ Git 主库；其他业务项目（如 某项目）各自拥有独立的 Git 仓�
    不要用一个光秃秃的「本机」。
 3. 主语确实是整机 ⇒ 写明例外面（「其他业务项目各自独立，互不干涉」），并给出反例场景。
 4. 审查他人的全局文档时，这类句子优先级最高——它能**静默改变**后续所有任务的动作范围。
+
+### 规则 17 · 安全删除：探针 → 送回收站 → `$I` 自证
+
+**症状**：`Remove-Item -Recurse -Force` 一敲，东西就没了；或者调了 `SendToRecycleBin` 就报告「已送回收站」——
+而回收站里根本没有它。
+
+**真实事故**：2026-11-02 workspace-write、2026-11-06 danger-full-access **两次复现**静默硬删——
+API 返回成功、文件确实消失，`$I` 条目零新增。**别拿沙箱模式当判据，两种模式都翻过车。**
+本会话我还用 `Remove-Item -Force` 清过临时脚本，按本条属违规（无探针、无 `$I` 验证）。
+
+**模板（PowerShell，三处都过才算删成功）**
+
+```powershell
+$Volume = '<盘符>:\'                                   # 目标所在卷
+$Sid    = (whoami /user | Select-String 'S-1-5-21-\S+').Matches.Value
+$Bin    = Join-Path (Join-Path $Volume '$Recycle.Bin') $Sid
+function Count-I { @(Get-ChildItem -LiteralPath $Bin -Force -Filter '$I*' -ErrorAction SilentlyContinue).Count }
+
+# ① 前置探针：同卷建一次性文件 → 用同一 API 删掉 → 看 $I 是否 +1
+$probe  = Join-Path $Volume ('__probe_{0}.tmp' -f [guid]::NewGuid().ToString('N'))
+Set-Content -LiteralPath $probe -Value 'probe' -Encoding utf8
+$b0 = Count-I
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($probe, 'OnlyErrorDialogs', 'SendToRecycleBin')
+if ((Count-I) - $b0 -ne 1) { throw '回收站不可用：探针未产生 $I，禁止继续删除' }
+
+# ② 真删：逐个路径送回收站，每个都自证
+foreach ($t in $Targets) {
+    $b = Count-I
+    if (Test-Path -LiteralPath $t -PathType Container) {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($t, 'OnlyErrorDialogs', 'SendToRecycleBin')
+    } else {
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($t, 'OnlyErrorDialogs', 'SendToRecycleBin')
+    }
+    if ((Count-I) - $b -ne 1) { throw "静默硬删：$t 未产生 $I —— 已永久删除，不可恢复" }
+}
+```
+
+**规则**
+
+1. 没有前置探针就**不许**调用删除；探针失败一律停手，不许"先删了再看"。
+2. `$I` 必须数**同一卷**的（`C:\$Recycle.Bin` 与 `D:\$Recycle.Bin` 各管各的）；SYSTEM/Administrator 目录无权限，
+   只认当前用户 SID 那个。路径里含 `$`，**PowerShell 单引号**才安全。
+3. 删完的报告必须写清：路径清单、`$I` 前后计数、是「进了回收站」还是「已永久删除」。
+4. 反射调用时参数数组要用 `[object[]]::new(4)` 组装，否则 PSObject 包装会让类型转换失败。
+
+### 规则 18 · 写含 Windows 路径的代码：原始字符串 + 落盘后字节自检
+
+**症状**：代码里的盘符路径（如 `<盘符>:\xxx`）被转义吃掉、路径少一个括号、文本里的 `%` 被当成格式占位符——
+脚本编译能过，运行时才发现目标文件根本不存在，或者写进去的是一串乱码。
+
+**本会话踩过的 4 次（全部留下现场）**
+
+| # | 写法 | 后果 |
+|---|---|---|
+| 1 | `"… 100% 对齐 …" % (a, b)` | `%` 被当占位符 ⇒ `TypeError: not enough arguments`，INDEX 整行没写进去 |
+| 2 | 手写 `100%` 落盘成 `100��` | 文件里出现乱码字符，靠比对才发现 |
+| 3 | `r"D:\某项目(含子目录"` | 目录名本身以 `)` 结尾，少写一个右括号 ⇒ `FileNotFoundError`（连犯 3 次） |
+| 4 | `python - <<'PY'` heredoc | PowerShell 不认，整条命令解析失败，**一个动作都没执行** |
+
+**规则**
+
+1. 含 Windows 路径的字符串**一律原始字符串** `r"<盘符>:\..."`；不能用 `r` 时写双反斜杠。
+   目录名以 `)`、空格、中文结尾时，写完先 `Test-Path` 再执行。
+2. 文本里含 `%` 时**禁止用 `%` 格式化**（用拼接或 f-string）；`%` 只用于纯数字占位。
+3. 多行代码**落成文件再跑**，不要用 shell 的 heredoc / here-string（PS 5.1 会吃引号、改语义）。
+4. 落盘后立刻做**字节级自检**：
+   - 无控制字符（`0x00-0x08`、`0x0b-0x1f`，`\t`/`\n`/`\r` 除外）；
+   - 关键片段在（`assert b.count(key) == 1`）；
+   - 行尾风格未变（CRLF 文件仍是纯 CRLF）；
+   - 前 8 字节不是 BOM 污染。
+5. 写坏过的文件**先 diff 再继续**：改完后独立再读一次盘，别信脚本自己打的 ✓。
 
 ## 上手核对清单（每次执行前逐条过）
 
