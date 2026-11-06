@@ -13,12 +13,12 @@
   4. tag 已存在 ⇒ 直接拒，绝不覆盖（覆盖 tag 是最难挽回的一类操作）。
   5. 版本号写进仓库的 `VERSION` 文件，否则 tag 指向的提交里**没有任何地方记录这个版本**，
      tag 就只是个标签，不能自证。
-  6. 默认**不推送**；推送需要显式 `--push`。发版是人的决定。
+  6. **本架构无远端**：只有本地提交与 tag，不推送（2026-11-06 架构简化）。
 
 用法：
     python tools/release.py --version v1.2.0 --dry-run     # 只体检，不动盘
     python tools/release.py --version v1.2.0               # 提交 + 打 tag（不推送）
-    python tools/release.py --version v1.2.0 --push        # 再推送 master 与 tag
+    python tools/sync-to-runtime.py                         # 发完版后同步到运行环境
 
 退出码：
     0  发版成功
@@ -26,7 +26,7 @@
     3  发版前门禁未通过（HANDOFF 缺失 / 过期 / 版本不符 / 时间戳在未来）
     4  发版后门禁复验未通过（已回滚 HANDOFF）
     5  工作树在本脚本之外仍有未提交改动（提交后仍不干净）
-    6  git 操作失败；或 origin 指向外网/非本机路径（推送机械闸门拦下）
+    6  git 操作失败
 """
 
 import argparse
@@ -67,39 +67,12 @@ def run(args, cwd, capture=True):
     return p.returncode, (p.stdout or "").strip() if capture else ""
 
 
-# ---- 推送机械闸门（注释拦不住脚本，只有这道闸门能把外网堵死）----
-EXTERNAL_MARKERS = ("http://", "https://", "git@")
-LOCAL_ABS_RE = re.compile(r"^[A-Za-z]:[\\/]")
-
-
-def assert_local_origin(repo):
-    """只允许把代码推到本机绝对路径的 origin；任何外网形态一律中止。
-
-    判定（全部满足才放行）：
-      1. 能读到 origin；
-      2. 不含 http:// / https:// / git@ 任意外网特征；
-      3. 是 Windows 本地绝对路径（形如 D:\\ 或 C:/）。
-    其余情况一律 fail-closed —— 包括读不到 origin、相对路径、ssh://、file://。
-    """
-    rc, origin = run(["git", "remote", "get-url", "origin"], repo)
-    origin = origin.strip() if rc == 0 else ""
-    blocked = (not origin) or any(m in origin for m in EXTERNAL_MARKERS) \
-        or not LOCAL_ABS_RE.match(origin)
-    if blocked:
-        print("Error: 绝对禁止向任何外网仓库执行 push！", file=sys.stderr)
-        print("  origin = %s" % (origin or "<读取失败或未配置>"), file=sys.stderr)
-        print("  只允许本机绝对路径，例如 D:\\xxx.git 或 C:\\xxx.git", file=sys.stderr)
-        sys.exit(6)
-    say("✓", "origin 是本机路径，放行：%s" % origin)
-
-
 def main():
     ap = argparse.ArgumentParser(description="发版门禁：校验 → 改版本 → 提交 → 打 tag")
     ap.add_argument("--version", required=True, help="目标版本号，如 v1.2.0")
     ap.add_argument("--root", default=None, help="工作区根（默认为本仓库的上一级）")
     ap.add_argument("--repo", default=None, help="技能仓库路径（默认本脚本所在仓库）")
     ap.add_argument("--note", default="", help="额外写进提交说明的一句话")
-    ap.add_argument("--push", action="store_true", help="推送 master 与该 tag（默认不推）")
     ap.add_argument("--dry-run", action="store_true", help="只做体检，不写盘、不提交、不打 tag")
     args = ap.parse_args()
 
@@ -203,24 +176,8 @@ def main():
         die(6, "打 tag 失败：%s" % out)
     say("✓", "已打 tag %s @ %s（annotated）" % (ver, head))
 
-    # ★ 绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。
-    #   --push 只会推给 origin；执行前先 `git remote -v` 确认 origin 是本地路径（不是 GitHub/Gitee）。
-    # --- 7. 推送（默认不做）---
-    if args.push:
-        assert_local_origin(repo)          # 闸门：外网 origin 直接中止
-        rc, out = run(["git", "push", "origin", "master"], repo)
-        if rc != 0:
-            die(6, "推送 master 失败：%s" % out)
-        rc, out = run(["git", "push", "origin", ver], repo)
-        if rc != 0:
-            die(6, "推送 tag 失败：%s" % out)
-        say("✓", "已推送 master 与 tag %s" % ver)
-    else:
-        say("·", "未推送。要发到远端请执行（仅限本地裸库；外网/公网一律禁止）：")
-        print("    cd %s" % repo)
-        print("    # 绝对禁止向任何外网/公网执行 git push。本地的裸库、工作区互相同步属于本地开发日常，不受此限。")
-        print("    git push origin master")
-        print("    git push origin %s" % ver)
+    say("·", "本架构无远端：提交 + 打 tag 即为完成，不推送。")
+    say("·", "同步到运行环境：python tools/sync-to-runtime.py")
 
     os.remove(backup) if os.path.exists(backup) else None
     print("=" * 62)
