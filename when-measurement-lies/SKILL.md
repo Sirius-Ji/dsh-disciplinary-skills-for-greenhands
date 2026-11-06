@@ -274,8 +274,8 @@ Thread 0x000039c0 (most recent call first):            ← 主线程（也在跑
 
 ```
 Current thread 0x0000666c (most recent call first):
-  File "<你的项目路径>\src\main.py", line 9095 in wait_until        ← loop.exec()
-  File "<你的项目路径>\src\main.py", line 9237 in _smoke_note_classify
+  File "D:\Project\某项目\src\main.py", line 9095 in wait_until        ← loop.exec()
+  File "D:\Project\某项目\src\main.py", line 9237 in _smoke_note_classify
   …
 ```
 
@@ -422,8 +422,8 @@ Current thread 0x0000666c (most recent call first):
   人能随手填的字段没有测量价值。所以正确修法是两步 ——
   加双边断言（拦住错误输入），**且**把输入源改成机器生成（`datetime.now()`，不给手动参数）。
   只做第一步，等于给一个本不该存在的输入加了个检查。
-- 本技能对应的真实产物：`skills/tools/check_handoff.py` 第 8 条断言（`exit 8`）
-  + `skills/tools/bump_handoff.py`（`updated_at` 只许机器生成）。
+- 本技能对应的真实产物：`tools/check_handoff.py` 第 8 条断言（`exit 8`）
+  + `tools/bump_handoff.py`（`updated_at` 只许机器生成）。
 
 
 ## 实战案例与复盘
@@ -456,6 +456,6 @@ Current thread 0x0000666c (most recent call first):
 - | **④ 断言层** | 断言恒真 / 恒假 | 门禁全绿但线上还是坏的 | **做灵敏度自证**（把修复去掉，断言必须变红）；用"能被区分的量"做断言 | 卡片 M 的第二坑：哨兵值 `NO_WRAP_LIMIT` 被翻译成 `None`，"不限宽"退化成"按默认算"⇒ 三条对照用例的宽**都恰好 481.23**、看不出区别（`081ab05` 的注释里写明）；卡片 O：`delete_*` 在旧实现下"删成功的返回 0"，于是"删不存在的返回 0"这条断言**无论修没修都绿** ⇒ 必须加"**删存在的返回 ≥1**"才有区分度（`e2d3838`） |
 - | **⑤ 时间层** | 异步 / 缓存 / 渲染的完成时点错位 | 数字随"跑第几次"变化；产物不全 | **等落盘（mtime）/ 同一次运行内串行取 / 把缓存清掉再量** | `windows-path-damage-diagnosis` 附录：验收测出 **157s**（全量重编译），真因是预热作业的最后一批文件**写到 21:52:29 才结束**，而验收跑在 21:51–21:52（磁盘上只有约 81/241 个公式）；卡片 L 的 `_all_math_render` 验收必须"**先渲染再取**"，否则同一批片段会被量两遍（缓存时序）；卡片 M 的 `PageTemplate` 6pt 内边距是**布局期**才体现的（第一版钳到 493.23 后仍越界 6.00pt） |
 - repr('== 气泡公式实时渲染冒烟（卡片 16）==')
-- File "<你的项目路径>\src\main.py", line 9095 in wait_until        ← loop.exec()
-- File "<你的项目路径>\src\main.py", line 9237 in _smoke_note_classify
+- File "D:\Project\某项目\src\main.py", line 9095 in wait_until        ← loop.exec()
+- File "D:\Project\某项目\src\main.py", line 9237 in _smoke_note_classify
 - （卡片 46c 的教训：region 级判"无中文"必然为假 ⇒ 那一层的放宽**永远不生效**。）
