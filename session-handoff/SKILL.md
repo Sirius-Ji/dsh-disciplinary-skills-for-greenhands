@@ -30,7 +30,9 @@ description: Use at the start of every task and when closing it; if the workspac
    ```
 
 2. **覆写 HANDOFF** — `updated_at` 换成当前时间，`archive_anchor` 填上一步的 ID。
-3. **追加 INDEX 一行** —
+3. **追加 INDEX 一行** — 追加到**表格最后一行下方**（`| H-00xx |` 那行之后），**不是文件末尾**；
+   INDEX 表格后面还有「分卷状态」章节，机械 append 到文件尾会把行插进章节里，索引表格当场断掉
+   （2026-11-06 `H-0023` 实测踩中：一行掉在「## 分卷状态」下面，靠人工搬回才修好）。
 
    ```
    | H-0042 | 2026-11-02T14:30 | 1241-1302 | 交接机制设计 | handoff,archive,grep |
