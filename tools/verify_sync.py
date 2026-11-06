@@ -52,14 +52,11 @@ def main():
 
     agents = os.path.join(repo, "AGENTS.repo.md")
     ab = rd(agents)
-    rt_agents = os.path.join(runtime, "AGENTS.repo.md")
-    if not os.path.isfile(rt_agents) or rd(rt_agents) != ab:
-        errs.append("运行时 AGENTS.repo.md 不一致")
     if not os.path.isfile(live) or rd(live) != ab:
         errs.append("~/.dsh/AGENTS.md 不一致")
 
     if os.path.isdir(runtime):
-        allowed = set(names) | {"AGENTS.repo.md"}
+        allowed = set(names)
         extra = [d for d in os.listdir(runtime) if d not in allowed]
         if extra:
             errs.append("运行时有多余条目：" + ", ".join(sorted(extra)))
@@ -72,7 +69,16 @@ def main():
         print("结论：不一致（请重跑 tools/sync-to-runtime.py）")
         return 1
     print("  ✓ 12 个 SKILL.md 逐字节相同")
-    print("  ✓ 运行时 AGENTS.repo.md 相同")
+    stray = []
+    if os.path.isdir(runtime):
+        for e in os.listdir(runtime):
+            p = os.path.join(runtime, e)
+            if os.path.isfile(p) and e.lower().endswith(".md"):
+                stray.append(e)
+    if stray:
+        errs.append("运行端根目录散落 .md：" + ", ".join(sorted(stray)))
+    else:
+        print("  ✓ 运行端根目录无散落 .md")
     print("  ✓ ~/.dsh/AGENTS.md 相同")
     print("  ✓ 运行时无多余目录")
     print("结论：主库与运行环境完全一致")

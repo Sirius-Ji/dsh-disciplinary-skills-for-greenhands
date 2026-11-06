@@ -74,7 +74,7 @@ def main():
     plan = []
     for name, src in skills.items():
         plan.append((src, os.path.join(runtime, name, "SKILL.md")))
-    plan.append((agents_src, os.path.join(runtime, "AGENTS.repo.md")))
+    # 运行端不再保留 AGENTS.repo.md（2026-11-06 用户裁定）：只留 ~/.dsh/AGENTS.md
     plan.append((agents_src, live))
 
     originals = {}
@@ -103,7 +103,7 @@ def main():
         print("  已按原内容回滚")
         return 1
 
-    allowed = set(skills) | {"AGENTS.repo.md"}
+    allowed = set(skills)
     removed = []
     for e in sorted(os.listdir(runtime)):
         if e in allowed:
@@ -123,8 +123,6 @@ def main():
         dst = os.path.join(runtime, name, "SKILL.md")
         if not os.path.isfile(dst) or sha(rd(dst)) != sha(rd(src)):
             fails.append(name + "/SKILL.md")
-    if sha(rd(os.path.join(runtime, "AGENTS.repo.md"))) != sha(rd(agents_src)):
-        fails.append("runtime AGENTS.repo.md")
     if not os.path.isfile(live) or sha(rd(live)) != sha(rd(agents_src)):
         fails.append("~/.dsh/AGENTS.md")
 
