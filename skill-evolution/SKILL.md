@@ -62,7 +62,7 @@ description: Use when the same pitfall recurs three times, a major incident gets
 
 草案只在对话里打印。**在用户给出明确的"准入 / 写入 / 批准"之前，一个字节都不许写盘。**
 
-## 四、准入后的写入流程（严格按序 · **改 → 同步 → 核验 → 提交**）
+## 四、准入后的写入流程（严格按序 · **改 → 提交 → 同步 → 核验**）
 
 > **为什么不是「提交时比对三端」了？**
 > 2026-11-06 架构简化：全机只剩一个 Git 仓库（`<你的主库路径>/skills`）。
@@ -91,25 +91,28 @@ description: Use when the same pitfall recurs three times, a major incident gets
 > 若仓库里也叫 `AGENTS.md`，运行时那份会被宿主当指令注入，而同步又会覆盖它——两个来源打架。
 
 1. 查工作树：`git status --porcelain` 必须为空；脏就先 commit 或停下报告；
-2. 改本仓库的 `AGENTS.repo.md`（**唯一**需要人改的地方）；
-3. **同步**：`python tools/sync-to-runtime.py`（把 `AGENTS.repo.md` 改名复制成 `~/.dsh/AGENTS.md`，
-   并按白名单刷新 12 个技能）；
-4. **核验**：`python tools/verify_sync.py` 必须输出「主库与运行环境完全一致」；
-5. **提交**：`git commit`（消息带证据锚，如 `refs H-0042`）；
+2. 改本仓库的 `AGENTS.repo.md`；
+3. **提交**：`git commit`（消息带证据锚，如 `refs H-0042`）—— **先入库，再同步**；
+4. **同步**：`python tools/sync-to-runtime.py`（把 `AGENTS.repo.md` 复制成 `~/.dsh/AGENTS.md`，
+   并按白名单刷新 12 个技能；运行端不再保留 `AGENTS.repo.md`）；
+5. **核验**：`python tools/verify_sync.py` 必须输出「主库与运行环境完全一致」；
 6. 报告：改了哪几行、哈希前后值、回滚命令。
 
 **B. 技能改动（`<name>/SKILL.md`）**
 
 1. 查工作树干净；
 2. 改本仓库的 `SKILL.md`；
-3. `python tools/sync-to-runtime.py`；
-4. `python tools/verify_sync.py` 核验；
-5. **提交**；
+3. **提交**（先入库）；
+4. `python tools/sync-to-runtime.py`；
+5. `python tools/verify_sync.py` 核验；
 6. 报告。
 
-> **两条铁律**
-> - **同步方向永远 D 盘 → C 盘。** 直接改 `~/.dsh/skills` 里的文件，下次同步会被整目录替换掉，改动蒸发。
-> - 提交本身**不要求**先同步（pre-commit 不再做跨端对比）；但**发版/收尾必须同步并核验**。
+> **三条铁律**
+> - **顺序不可颠倒：改 → commit → sync → verify。** 绝不允许在 commit 之前先同步 ——
+>   commit 一旦失败，主库和运行端就脱节了，而且这种脱节是**静默**的。
+> - **同步方向永远 D 盘 → C 盘。** 直接改 `~/.dsh` 里的文件，下次同步会被覆盖，改动蒸发。
+> - **C 盘 `~/.dsh/skills` 下不允许出现任何 `.md` 文件**：`AGENTS.repo.md` 只留在主库，
+>   生效端只要 `~/.dsh/AGENTS.md` 一份。
 
 ### 4.2 同步失败怎么办
 
