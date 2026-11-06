@@ -166,7 +166,7 @@ next_action: 一句话说清"接手后第一个该做的动作"
 ### 第三步：判据只认退出码 + digest
 
 ```powershell
-node skills/tools/verify_discipline_channel.mjs --require-compaction --cross-session
+node tools/verify_discipline_channel.mjs --require-compaction --cross-session
 ```
 
 看输出里那句"✓ PASS"不算数——那是脚本自己说的。要同时满足三条：

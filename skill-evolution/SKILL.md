@@ -87,6 +87,8 @@ description: Use when the same pitfall recurs three times, a major incident gets
 
 ### 4.1 两类改动，路线相同
 
+> **⚠️ 以下所有操作（包含 git 命令与 python 脚本），必须在主库根目录（即包含 `.git` 的 `skills/` 目录）下执行。**
+
 **A. 纪律改动（`AGENTS.repo.md`）**
 
 > 仓库内叫 `AGENTS.repo.md`，生效端叫 `~/.dsh/AGENTS.md`，**刻意不同名**：
@@ -115,6 +117,14 @@ description: Use when the same pitfall recurs three times, a major incident gets
 > - **同步方向永远 D 盘 → C 盘。** 直接改 `~/.dsh` 里的文件，下次同步会被覆盖，改动蒸发。
 > - **C 盘 `~/.dsh/skills` 下不允许出现任何 `.md` 文件**：`AGENTS.repo.md` 只留在主库，
 >   生效端只要 `~/.dsh/AGENTS.md` 一份。
+
+**C. 强制记录发版待办（`../PENDING_RELEASE.md`）**
+
+任何涉及技能或纪律的修改，**只要用户给出准入并落盘主库**，就必须立刻在工作区根目录（`../PENDING_RELEASE.md`）
+追加一条记录：改了什么技能、具体改了什么内容。
+
+这是强制动作，**不允许有任何"这个改动可能不需要发布"的侥幸心理**。判断"要不要发"不是我的工作，
+登记才是；发布时由人统一在这里读取。
 
 ### 4.2 同步失败怎么办
 
@@ -173,3 +183,4 @@ description: Use when the same pitfall recurs three times, a major incident gets
 - ❌ 在没跑过触发证据的情况下声称"这是第 3 次"；
 - ❌ 把「跳过」的 exit 0 当成通过（门禁自己也要自证前提，见 4.4）；
 - ❌ 让 `py_compile` 产物（`__pycache__/`）混进提交。
+- ❌ **修改了技能并落盘主库，但未在 `../PENDING_RELEASE.md` 中强制登记** —— 漏登记等于让改动在下一次发版时凭空消失。
