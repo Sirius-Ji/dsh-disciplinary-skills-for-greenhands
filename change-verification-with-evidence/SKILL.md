@@ -438,7 +438,7 @@ if ((& $countI) - $before -ne 1) { throw "没进回收站（实为硬删）: $f"
 | 1 | **user 角色验证** | 最新 `source.kind=agent-instructions` 记录满足：`role="user"`、`changes[0].digest == sha1(磁盘 AGENTS.md)`、正文逐字符包含磁盘全文 |
 | 2 | **压缩存活测试** | 触发一次 `/compact` 后，`compaction/end` 之后必须出现新的 `baseline=true` 注入记录，且内容与磁盘逐字节相同 |
 
-一键跑：`node skills/tools/verify_discipline_channel.mjs --cross-session`
+一键跑：`node tools/verify_discipline_channel.mjs --cross-session`
 
 退出码：**0 = 通过 / 1 = 失败 / 2 = 无法判定**。**2 绝不当绿** —— 没压缩过就是没测过。
 
