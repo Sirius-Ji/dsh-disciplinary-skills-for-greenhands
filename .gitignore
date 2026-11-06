@@ -30,3 +30,5 @@ gitdir:*
 
 # release/ 发布打包产物（zip 不进 Git）
 /release/
+# 备份快照目录（bundle 产物，不进仓库）
+/backup/

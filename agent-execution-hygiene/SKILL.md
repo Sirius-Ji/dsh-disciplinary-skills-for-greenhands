@@ -27,7 +27,7 @@ description: Use when your own tool runs start failing for self-inflicted reason
 5. 这次提交**前后各跑过一次**门禁吗？
 6. 这次要落盘的**字节**，和我要的是同一串吗？（看前 4 字节：`fffe`/`feff` = 被 UTF-16 坑了）
 
-## 十八条硬规则
+## 十九条硬规则
 
 ### 规则 1 · 写 → 验 → 跑
 写出被调用文件后，**立刻**确认它存在（`Test-Path` / `ls` / `stat`），再执行。
@@ -325,6 +325,33 @@ foreach ($t in $Targets) {
    - 前 8 字节不是 BOM 污染。
 5. 写坏过的文件**先 diff 再继续**：改完后独立再读一次盘，别信脚本自己打的 ✓。
 
+### 规则 19 · PowerShell 只许写短脚本；复杂逻辑一律 Python
+
+**症状**：用 PowerShell 写一个几十行的删除/探针脚本，跑起来先吐一堆乱码 + `ParserError`，
+结果是**整段脚本一行都没执行**，而你以为它跑了。
+
+**真实事故（2026-11-06，一次会话内 ≥3 次）**：
+
+| # | 写法 | 后果 |
+|---|---|---|
+| 1 | 含中文的 `.ps1` 用 UTF-8 **无 BOM** 落盘 | PS 5.1 按 GBK 解码 ⇒ 中文乱码、引号被撑坏 ⇒ `ParserError`，探针根本没跑 |
+| 2 | `.ps1` 里写中文路径字面量 | 同上，路径变乱码 ⇒ `Test-Path` 全 False，误判「文件不存在」 |
+| 3 | 没 `Add-Type` 就调 `[Microsoft.VisualBasic.FileIO.FileSystem]` | `TypeNotFound`，删除函数一行未执行 |
+| 4 | `python - <<'PY'` heredoc | PowerShell 不认，整条命令解析失败 |
+
+**规则**
+
+1. **PowerShell 只写 ≤5 行的短命令**（查状态、跑单个程序、读几个属性）。超过 5 行就换 Python。
+2. **复杂自动化、临时探针、任何循环或多步判断，一律用 Python 写文件再跑**；Python 3 源码默认按 UTF-8 解析，
+   没有 PS 5.1 的 GBK 历史包袱。
+3. **必须写 `.ps1` 且内容含任何中文/非 ASCII 字符时，强制落盘为 UTF-8 with BOM**（`EF BB BF`）；
+   改已有 `.ps1` 先看前 3 字节，原文件有 BOM 就必须保 BOM、行尾也要保持原样。
+4. `.ps1` 里**不要写中文路径字面量**：用 ASCII 通配符（`Get-ChildItem -Path '<盘符>:\SomeDir*'`）、
+   `$PSScriptRoot` 或参数传入——中文只出现在运行时值里，不出现在源码里。
+5. 调用 .NET 类型前先 `Add-Type -AssemblyName <程序集>`（如 `Microsoft.VisualBasic`）。
+6. 脚本落盘后**先语法预检**再执行：
+   `[System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$null,[ref]$errs)`；
+   `$errs.Count -ne 0` 就是没跑起来，别急着看业务结果。
 ## 上手核对清单（每次执行前逐条过）
 
 - [ ] 被调用的文件存在？（绝对路径 + 文件名逐字符核对）

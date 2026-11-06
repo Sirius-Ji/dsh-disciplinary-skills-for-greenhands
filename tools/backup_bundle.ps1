@@ -22,12 +22,18 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$OutDir = '<你的备份目录>\backup\skills-bundles',
+    [string]$OutDir = '',
     [string]$Tag    = '',
     [string]$RepoPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Default output: <workspace>\backup\skills-bundles (workspace-relative; no absolute machine path)
+if (-not $OutDir) {
+    $wsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $OutDir = Join-Path $wsRoot 'backup\skills-bundles'
+}
 
 function Invoke-Git {
     param(
